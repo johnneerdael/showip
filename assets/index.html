@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>showip — connection inspector</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <section id="hero" class="hero hero--unknown">
+      <div class="hero__label">You are connected over</div>
+      <div id="protocol" class="hero__protocol">…</div>
+      <button id="ip" class="hero__ip" type="button" title="Click to copy">checking…</button>
+      <div id="copied" class="hero__copied" aria-live="polite"></div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel__title">Your browser</h2>
+      <div class="kv"><span class="kv__k">Browser</span><span id="ua-browser" class="kv__v">—</span></div>
+      <div class="kv"><span class="kv__k">OS</span><span id="ua-os" class="kv__v">—</span></div>
+      <details class="ua-raw">
+        <summary>Raw User-Agent</summary>
+        <code id="ua-raw"></code>
+      </details>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel__title">Speedtest</h2>
+      <div class="meters">
+        <div class="meter"><span class="meter__k">Download</span><span id="dl" class="meter__v">—</span><span class="meter__u">Mbps</span></div>
+        <div class="meter"><span class="meter__k">Upload</span><span id="ul" class="meter__v">—</span><span class="meter__u">Mbps</span></div>
+        <div class="meter"><span class="meter__k">Ping</span><span id="ping" class="meter__v">—</span><span class="meter__u">ms</span></div>
+        <div class="meter"><span class="meter__k">Jitter</span><span id="jitter" class="meter__v">—</span><span class="meter__u">ms</span></div>
+      </div>
+      <button id="start" class="btn" type="button">Start speedtest</button>
+    </section>
+  </main>
+
+  <!-- LibreSpeed client (copied in by the Dockerfile from the pinned backend source) -->
+  <script src="speedtest.js"></script>
+  <script src="classify.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
