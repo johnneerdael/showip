@@ -4,8 +4,14 @@ A single Docker container that hosts a sleek dark webpage telling visitors wheth
 they connected over **IPv4** or **IPv6**, showing their IP and browser, plus a full
 download / upload / ping / jitter **speedtest**.
 
-The detection is authoritative: the backend reports the exact remote address of the
-incoming connection (`/getIP`), and the page classifies it client-side — no guessing.
+The detection is authoritative and **proxy-proof**: the backend reports the exact
+remote address of the socket it actually terminates (`/getIP`) and deliberately
+**ignores** forwarding headers (`X-Forwarded-For`, `X-Real-IP`, etc.). The page
+classifies that address client-side — no guessing, and no way for an upstream proxy
+to make an IPv6 connection look like IPv4.
+
+The backend is a tiny self-contained Go server (standard library only — no external
+dependencies, no database, no outbound calls of any kind).
 
 ## Run
 
@@ -40,17 +46,16 @@ docker compose -f docker-compose.ghcr.yml up -d
 
 ## Self-contained — no external calls
 
-The container makes **no outbound network calls**:
+The backend implements only what this tool needs:
 
-- Telemetry and the stats database are disabled (`telemetry_level=none`,
-  `database_type="none"`) — no result PNGs, no stored data.
-- `server_lat`/`server_lng` are set non-zero in `settings.toml` so the backend does
-  **not** phone `ipinfo.io` at startup to geolocate itself.
-- The frontend disables the speedtest client's ISP/geo enrichment
-  (`getIp_ispInfo=false`), so the `/getIP` request never triggers an `ipinfo.io`
-  lookup either.
+- `GET /getIP` — returns the socket peer IP as JSON (`{"processedString": "..."}`),
+  ignoring forwarding headers.
+- `GET /garbage?ckSize=<MiB>` — random data stream for the download test.
+- `GET|POST /empty` — drained, empty 200, for the ping and upload tests.
+- everything else — static files from `/app/assets`.
 
-The only network traffic is between the visitor's browser and this container.
+There is no telemetry, no database, and no IP-geolocation / `ipinfo.io` lookup of any
+kind. The only network traffic is between the visitor's browser and this container.
 
 ## IPv6 — use host networking (important)
 
@@ -82,14 +87,19 @@ The host still needs to actually have IPv6:
 Verify the host is listening on both families: `ss -tlnp | grep ':80'` should show
 both a `0.0.0.0:80` and a `[::]:80` (or `*:80`) line.
 
-### Behind a reverse proxy?
+### Behind a reverse proxy / SWG / cloud access layer?
 
-If a proxy (nginx, Traefik, Caddy, Cloudflare) terminates the connection, the
-container sees the *proxy's* IP. The backend already honours forwarding headers in
-this order: `CF-Connecting-IPv6`, `Client-IP`, `X-Real-IP`, `X-Forwarded-For`.
-Make sure your proxy sets one of these to the real client address, e.g. for nginx:
-`proxy_set_header X-Real-IP $remote_addr;` (and connect to the backend over the same
-protocol the client used).
+By design the page reports **the connection the server itself terminates**, not what
+an upstream proxy claims. If something (nginx, Traefik, Cloudflare, a Secure Web
+Gateway, an AWS/NPA access endpoint, etc.) sits in front and re-originates the
+connection, the container's real peer is that proxy — so the page shows the proxy's
+address and protocol, which is the IP/protocol the server actually sees.
+
+This is intentional: it's why an IPv6-only host now correctly shows **IPv6** even
+when the proxy reached *you* over IPv4 and forwarded an `X-Forwarded-For: <your-v4>`
+header (which earlier versions wrongly trusted). For an end-to-end view of *your*
+client, point showip at a host the client can reach **directly**, without an
+intermediary.
 
 ### Bridge network alternative (not recommended for detection)
 
@@ -98,21 +108,22 @@ You *can* enable IPv6 on the docker daemon (`/etc/docker/daemon.json`:
 docker), but NATed IPv6 still masquerades the source to the gateway, so detection
 remains unreliable. Host networking is the correct approach for this tool.
 
-## Running unprivileged
+## Running on a different port
 
-Binding port 80 inside the container needs root. To run the backend as a non-root
-user, change `listen_port` in `settings.toml` to `8989` and map it:
+The backend listens on port 80 by default. Override it (e.g. to run unprivileged)
+with the `PORT` environment variable, and map it:
 
 ```bash
-docker run -d -p 80:8989 showip
+docker run -d -e PORT=8080 -p 80:8080 showip
 ```
+
+`ASSETS_PATH` (default `/app/assets`) controls where static files are served from.
 
 ## Configuration
 
-Backend behavior is controlled by `settings.toml`. The frontend lives in `assets/`.
-The speedtest engine (`speedtest.js` / `speedtest_worker.js`) is copied from the
-pinned LibreSpeed Go backend (v1.1.6) at build time so client and server always
-match.
+The frontend lives in `assets/`. The speedtest measurement client
+(`speedtest.js` / `speedtest_worker.js`) is the LibreSpeed client (LGPL-3.0),
+vendored into `assets/`. The backend is `server.go` (Go standard library only).
 
 ## Development
 
@@ -133,5 +144,5 @@ sees the true client address. You can confirm the detection mechanism locally wi
 
 ```bash
 docker exec <container> wget -qO- http://127.0.0.1/getIP
-# -> {"processedString":"127.0.0.1 - localhost IPv4 access", ...}
+# -> {"processedString":"127.0.0.1","rawIspInfo":""}
 ```
