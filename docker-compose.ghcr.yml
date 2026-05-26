@@ -1,0 +1,8 @@
+services:
+  showip:
+    image: ghcr.io/johnneerdael/showip:latest
+    container_name: showip
+    ports:
+      - "80:80"
+    pull_policy: always
+    restart: unless-stopped

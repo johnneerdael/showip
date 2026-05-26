@@ -29,10 +29,14 @@ Then visit `http://<host>/`.
 Published automatically by CI (see below):
 
 ```bash
-docker run -d --name showip -p 80:80 ghcr.io/<owner>/showip:latest
+docker run -d --name showip -p 80:80 ghcr.io/johnneerdael/showip:latest
 ```
 
-Replace `<owner>` with the GitHub user/org the repo lives under.
+Or with Compose (pulls the published image, no local build):
+
+```bash
+docker compose -f docker-compose.ghcr.yml up -d
+```
 
 ## Self-contained — no external calls
 
