@@ -78,6 +78,9 @@ function wireSpeedtest() {
   s.setParameter("url_ping", "empty");
   s.setParameter("url_getIp", "getIP");
   s.setParameter("telemetry_level", "none");
+  // Keep everything self-contained: don't ask the backend to enrich the IP with
+  // ISP/geo info, which would make it call ipinfo.io during the test.
+  s.setParameter("getIp_ispInfo", false);
 
   s.onupdate = (data) => {
     document.getElementById("dl").textContent = fmt(data.dlStatus);

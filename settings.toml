@@ -3,8 +3,11 @@
 bind_address=""
 listen_port=80
 proxyprotocol_port=0
-server_lat=0
-server_lng=0
+# Non-zero so the backend uses these coordinates directly instead of phoning
+# ipinfo.io at startup to geolocate itself. The values are cosmetic only — our
+# single-server UI never displays server location/distance.
+server_lat=1
+server_lng=1
 ipinfo_api_key=""
 
 # Serve our custom frontend instead of the embedded default UI.
