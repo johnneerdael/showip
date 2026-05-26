@@ -1,0 +1,19 @@
+# showip backend config for librespeed-go.
+# Bind all interfaces (both IPv4 and IPv6) on port 80.
+bind_address=""
+listen_port=80
+proxyprotocol_port=0
+server_lat=0
+server_lng=0
+ipinfo_api_key=""
+
+# Serve our custom frontend instead of the embedded default UI.
+assets_path="/app/assets"
+
+# No telemetry/stats: keeps the container fully self-contained, no DB, no result PNGs.
+statistics_password="disabled"
+redact_ip_addresses=false
+database_type="none"
+
+enable_tls=false
+enable_http2=false
