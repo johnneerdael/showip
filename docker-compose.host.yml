@@ -1,0 +1,12 @@
+services:
+  showip:
+    image: ghcr.io/johnneerdael/showip:latest
+    container_name: showip
+    # Host networking is required for accurate IPv6 detection: the backend binds
+    # the host's real interfaces (0.0.0.0:80 and [::]:80) directly and sees the
+    # true client address. With the default bridge + docker-proxy, incoming
+    # connections are NAT'd and the container only ever sees the IPv4 gateway.
+    # Linux only. The container listens on port 80 (see settings.toml).
+    network_mode: host
+    pull_policy: always
+    restart: unless-stopped

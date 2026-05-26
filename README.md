@@ -52,25 +52,51 @@ The container makes **no outbound network calls**:
 
 The only network traffic is between the visitor's browser and this container.
 
-## IPv6 — important host prerequisite
+## IPv6 — use host networking (important)
 
-The image is protocol-agnostic: it simply reports whichever protocol a request
-arrives on. For visitors to actually reach it over **both** IPv4 and IPv6, the
-**Docker host** must provide both:
+**If the page only ever reports IPv4, this is why.** With Docker's default bridge
+network and published ports (`-p 80:80`), `docker-proxy` NATs every incoming
+connection. The container then sees the connection coming from the IPv4 docker
+gateway — so even genuine IPv6 visitors are reported as IPv4, and IPv6 clients may
+not reach the port at all. The original protocol is destroyed at the NAT layer.
 
-1. **Enable IPv6 in the Docker daemon** (`/etc/docker/daemon.json`):
-   ```json
-   { "ipv6": true, "ip6tables": true, "fixed-cidr-v6": "fd00::/80" }
-   ```
-   then `systemctl restart docker`. (Or run with `--network host` on an
-   IPv6-enabled host.)
-2. **Publish on an IPv6 address** — `-p 80:80` binds both families on dual-stack
-   hosts; verify with `ss -tlnp | grep :80`.
-3. **DNS** — the hostname needs both an `A` (IPv4) and `AAAA` (IPv6) record so
+The fix is **host networking** (Linux only), which lets the backend bind the host's
+real interfaces (`0.0.0.0:80` and `[::]:80`) and see the true client address:
+
+```bash
+docker run -d --name showip --network host ghcr.io/johnneerdael/showip:latest
+```
+
+or with the provided compose file:
+
+```bash
+docker compose -f docker-compose.host.yml up -d
+```
+
+The host still needs to actually have IPv6:
+
+1. **A routable IPv6 address** on the host and a firewall that allows tcp/80.
+2. **DNS** — the hostname needs both an `A` (IPv4) and `AAAA` (IPv6) record so
    clients can choose either path.
 
-Without host IPv6, the page still works perfectly over IPv4 — it will simply always
-report IPv4.
+Verify the host is listening on both families: `ss -tlnp | grep ':80'` should show
+both a `0.0.0.0:80` and a `[::]:80` (or `*:80`) line.
+
+### Behind a reverse proxy?
+
+If a proxy (nginx, Traefik, Caddy, Cloudflare) terminates the connection, the
+container sees the *proxy's* IP. The backend already honours forwarding headers in
+this order: `CF-Connecting-IPv6`, `Client-IP`, `X-Real-IP`, `X-Forwarded-For`.
+Make sure your proxy sets one of these to the real client address, e.g. for nginx:
+`proxy_set_header X-Real-IP $remote_addr;` (and connect to the backend over the same
+protocol the client used).
+
+### Bridge network alternative (not recommended for detection)
+
+You *can* enable IPv6 on the docker daemon (`/etc/docker/daemon.json`:
+`{ "ipv6": true, "ip6tables": true, "fixed-cidr-v6": "fd00::/80" }`, then restart
+docker), but NATed IPv6 still masquerades the source to the gateway, so detection
+remains unreliable. Host networking is the correct approach for this tool.
 
 ## Running unprivileged
 
